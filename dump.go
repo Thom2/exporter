@@ -65,6 +65,9 @@ body {
 	background:rgb(221,247,200);
 	text-align:right;
 }
+.datetime {
+    margin: 2px;
+}
 --></style>
 <h1>WhatsApp</h1>
 
@@ -80,7 +83,18 @@ body {
 			<video controls>
 				<source src="../{{.Media}}" type="video/mp4">
 			</video>
+		{{ else if eq .MediaExt ".m4a" }}
+			<audio controls preload="none" style="width:480px;">
+				<source src="../{{.Media}}" type="audio/mp4"/>
+			</audio>
+		{{ else if eq .MediaExt ".opus" }}
+			<audio controls preload="none" style="width:480px;">
+				<source src="../{{.Media}}" type="audio/ogg"/>
+			</audio>
 		{{end}}
+	</p>
+	<p class="datetime">
+		{{.Date}}
 	</p>
 {{end}}
 </div><!-- chat -->
@@ -97,8 +111,8 @@ body {
 	check("DumpSession creating file", err)
 	defer out.Close()
 
-	if len(messages) > 30 {
-		messages = messages[len(messages)-30:]
+	if len(messages) > 10000 {
+		messages = messages[len(messages)-10000:]
 	}
 	err = t.Execute(out, messages)
 	check("DumpSession executing template", err)

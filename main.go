@@ -179,28 +179,12 @@ func (app *App) SessionMessages(session Session) []Message {
 		var mediaID *int
 		var text *string
 		var date string
-		// TODO: Get timestamp from ZMESSAGEDATE and add 978307200 (2001,1,1)
 		if err := rows.Scan(&msg.JID, &msg.Name, &text, &mediaID, &date); err != nil {
 			log.Println("Error:", err)
 		}
 		if text != nil {
 			msg.Text = *text
 		}
-		// date time
-		t, err := time.Parse(time.RFC3339, date)
-		if err == nil {
-			tt := t.Unix()
-			log.Println("unix: ", tt)
-			newTime64 := tt + 978307200
-			newTime := time.Unix(newTime64, 0).Format(time.RFC3339)
-			//appleTime, _ := time.Parse("2006-01-01", "2001-01-01")
-			//log.Println("time: ", t)
-			//newTime := appleTime.Add(appleTime.Sub(t))
-			// t = t.Add(978307200)
-			log.Println("time: ", newTime)
-			msg.Date = newTime
-		}
-
 		if mediaID != nil {
 			media := app.MediaMap[*mediaID]
 			if media.Hash != "" {
@@ -217,6 +201,14 @@ func (app *App) SessionMessages(session Session) []Message {
 				// log.Println(">", *mediaID, media)
 			}
 		}
+
+		// date time (data formatted as date_time string - TODO: how to do SELECT as INTEGER?)
+		t, err := time.Parse(time.RFC3339, date)
+		if err == nil {
+			appleTime := t.Unix() + 978307200 // apple time starts at 2001,1,1
+			msg.Date = time.Unix(appleTime, 0).Format(time.RFC3339)
+		}
+
 		messages = append(messages, msg)
 	}
 	return messages
