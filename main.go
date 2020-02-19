@@ -30,18 +30,20 @@ type Session struct {
 }
 
 type Media struct {
-	Hash string
-	Path string
-	Ext  string
+	Hash  string
+	Path  string
+	Ext   string
+	Title string
 }
 
 type Message struct {
 	JID      *string
-	Name     *string
+	Name     string
 	Text     string
 	Media    string
 	MediaExt string
 	Date     string
+	IsGroup  bool
 }
 
 func NewApp(src, dst string) *App {
@@ -100,7 +102,7 @@ func (app *App) LoadMediaMap() {
 	var err error
 	var query string
 	var id int
-	var hash, path *string
+	var hash, path, title *string
 
 	// Build path to hash map
 	// e.g. hashMap["somepath"] = "124324345436645645"
@@ -116,17 +118,20 @@ func (app *App) LoadMediaMap() {
 	}
 
 	// Build Media Hash
-	query = "SELECT Z_PK, ZMEDIALOCALPATH FROM ZWAMEDIAITEM"
+	query = "SELECT Z_PK, ZMEDIALOCALPATH, ZTITLE FROM ZWAMEDIAITEM"
 	rows, err = app.ChatDB.Query(query)
 	check("MediaMap ChatDB", err)
 
 	for rows.Next() {
-		err = rows.Scan(&id, &path)
+		err = rows.Scan(&id, &path, &title)
 		check("scan 2", err)
 		if path == nil {
 			continue
 		}
 		media := Media{}
+		if title != nil {
+			media.Title = *title
+		}
 		media.Path = *path
 		media.Ext = filepath.Ext(*path)
 		if path != nil && strings.HasPrefix(*path, "/") {
@@ -161,7 +166,7 @@ func (app *App) GetSessions() ([]Session, error) {
 func (app *App) SessionMessages(session Session) []Message {
 	var err error
 	query := `
-	SELECT ZFROMJID, ZPUSHNAME, ZTEXT, ZMEDIAITEM, ZMESSAGEDATE AS DECIMAL
+	SELECT ZFROMJID, ZPUSHNAME, ZTEXT, ZMEDIAITEM, ZMESSAGEDATE, ZGROUPMEMBER
 	FROM ZWAMESSAGE
 	WHERE ZCHATSESSION = ?
 	ORDER BY ZSORT 
@@ -178,12 +183,17 @@ func (app *App) SessionMessages(session Session) []Message {
 		var msg Message
 		var mediaID *int
 		var text *string
-		var date string
-		if err := rows.Scan(&msg.JID, &msg.Name, &text, &mediaID, &date); err != nil {
+		var date *string
+		var name *string
+		var group *string
+		if err := rows.Scan(&msg.JID, &name, &text, &mediaID, &date, &group); err != nil {
 			log.Println("Error:", err)
 		}
 		if text != nil {
 			msg.Text = *text
+		}
+		if name != nil {
+			msg.Name = *name
 		}
 		if mediaID != nil {
 			media := app.MediaMap[*mediaID]
@@ -196,18 +206,22 @@ func (app *App) SessionMessages(session Session) []Message {
 				}
 				msg.Media = path.Join(mediaBase, fmt.Sprintf("%d%s", *mediaID, media.Ext))
 				msg.MediaExt = media.Ext
+				msg.Text = media.Title
 			} else {
 				// VCARD maybe?
 				// log.Println(">", *mediaID, media)
 			}
 		}
 
-		// date time (data formatted as date_time string - TODO: how to do SELECT as INTEGER?)
-		t, err := time.Parse(time.RFC3339, date)
-		if err == nil {
-			appleTime := t.Unix() + 978307200 // apple time starts at 2001,1,1
-			msg.Date = time.Unix(appleTime, 0).Format(time.RFC3339)
+		if date != nil {
+			// date time (data formatted as date_time string - TODO: how to do SELECT as INTEGER?)
+			t, err := time.Parse(time.RFC3339, *date)
+			if err == nil {
+				appleTime := t.Unix() + 978307200 // apple time starts at 2001,1,1
+				msg.Date = time.Unix(appleTime, 0).Format(time.RFC3339)
+			}
 		}
+		msg.IsGroup = group != nil
 
 		messages = append(messages, msg)
 	}
@@ -219,7 +233,7 @@ func main() {
 
 	srcPtr := flag.String("src", "src", "iPhone backup source directory")
 	dstPtr := flag.String("dst", "dst", "WhatsApp dump directory")
-	limitPtr := flag.Int("limit", 500, "Limit number of chats to export")
+	//limitPtr := flag.Int("limit", 500, "Limit number of chats to export")
 	flag.Parse()
 
 	app := NewApp(*srcPtr, *dstPtr)
@@ -233,12 +247,14 @@ func main() {
 
 	counter := 0
 	for _, session := range sessions {
+		//session = sessions[3]
 		// Build Chat Session
 		fmt.Println("Building session:", session.ID, " : ", session.Name)
 		messages := app.SessionMessages(session)
 		app.DumpSession(session, messages)
 		counter++
-		if counter > *limitPtr {
+		if counter > 0 { // TODO
+			//	if counter > *limitPtr {
 			break
 		}
 	}

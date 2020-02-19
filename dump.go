@@ -68,13 +68,26 @@ body {
 .datetime {
     margin: 2px;
 }
+.name {
+	float: right;
+}
 --></style>
 <h1>WhatsApp</h1>
 
 <div class="chat">
 {{range .}}	
+	<div class="datetime">
+		{{.Date}}
+		{{ if .IsGroup }}
+			{{ if ne .Name "" }}
+				<div class="name"> {{ .Name }} </div>
+			{{end}}
+		{{end}}
+	</div>
 	<p class="message {{if .JID}}incoming{{else}}outgoing{{end}}">
-		{{ nl2br .Text }}
+		{{ if ne .Text "" }}
+			{{ nl2br .Text }}
+		{{end}}
 		{{ if eq .MediaExt ".jpg" }}
 			<img src="../{{.Media}}">
 		{{ else if eq .MediaExt ".png" }}
@@ -83,6 +96,9 @@ body {
 			<video controls>
 				<source src="../{{.Media}}" type="video/mp4">
 			</video>
+			{{ if ne .Text "" }}
+				<p>{{ .Text }}</p>
+			{{end}}
 		{{ else if eq .MediaExt ".m4a" }}
 			<audio controls preload="none" style="width:480px;">
 				<source src="../{{.Media}}" type="audio/mp4"/>
@@ -92,9 +108,6 @@ body {
 				<source src="../{{.Media}}" type="audio/ogg"/>
 			</audio>
 		{{end}}
-	</p>
-	<p class="datetime">
-		{{.Date}}
 	</p>
 {{end}}
 </div><!-- chat -->
