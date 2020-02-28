@@ -42,7 +42,7 @@ func (app *App) DumpSessions(css []Session) {
 	check("DumpSessions executing template", err)
 }
 
-func (app *App) DumpSession(session Session, messages []Message) {
+func (app *App) DumpSession(session Session, messages []Message, msgLimit int) {
 	tpl := `
 <style><!--
 body {
@@ -124,8 +124,8 @@ body {
 	check("DumpSession creating file", err)
 	defer out.Close()
 
-	if len(messages) > 10000 {
-		messages = messages[len(messages)-10000:]
+	if msgLimit > 0 && len(messages) > msgLimit {
+		messages = messages[len(messages)-msgLimit:]
 	}
 	err = t.Execute(out, messages)
 	check("DumpSession executing template", err)

@@ -141,6 +141,25 @@ func (app *App) LoadMediaMap() {
 		}
 		app.MediaMap[id] = media
 	}
+
+	// Profile pictures
+	var jid *string
+	query = "SELECT ZJID, ZPATH FROM ZWAPROFILEPICTUREITEM"
+	rows, err = app.ChatDB.Query(query)
+	check("MediaMap ChatDB ProfilePicture", err)
+
+	media := Media{}
+	for rows.Next() {
+		err = rows.Scan(&jid, &path)
+		check("scan 3", err) // Media/Profile/393475816127-1552393720
+		if path == nil {
+			continue
+		}
+
+		media.Path = *path
+		media.Hash = hashMap[*path]
+
+	}
 }
 
 func (app *App) GetSessions() ([]Session, error) {
@@ -233,7 +252,9 @@ func main() {
 
 	srcPtr := flag.String("src", "src", "iPhone backup source directory")
 	dstPtr := flag.String("dst", "dst", "WhatsApp dump directory")
-	//limitPtr := flag.Int("limit", 500, "Limit number of chats to export")
+	chatLimitPtr := flag.Int("limitChat", -1, "Limit number of chats to export")
+	msgLimitPtr := flag.Int("limitMsg", -1, "Limit number of messages per chat")
+
 	flag.Parse()
 
 	app := NewApp(*srcPtr, *dstPtr)
@@ -247,14 +268,12 @@ func main() {
 
 	counter := 0
 	for _, session := range sessions {
-		//session = sessions[3]
 		// Build Chat Session
 		fmt.Println("Building session:", session.ID, " : ", session.Name)
 		messages := app.SessionMessages(session)
-		app.DumpSession(session, messages)
+		app.DumpSession(session, messages, *msgLimitPtr)
 		counter++
-		if counter > 0 { // TODO
-			//	if counter > *limitPtr {
+		if *chatLimitPtr > 0 && counter > *chatLimitPtr {
 			break
 		}
 	}
